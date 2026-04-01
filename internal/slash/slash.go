@@ -89,6 +89,11 @@ func AllCommands() []CommandDef {
 		{Name: "/copy", Description: "Copy last response to clipboard"},
 		{Name: "/stats", Description: "Detailed session statistics"},
 		{Name: "/retry", Description: "Retry last message"},
+		{Name: "/usage", Description: "Detailed API usage breakdown"},
+		// More Git
+		{Name: "/branch", Description: "Git branch management", HasArgs: true},
+		{Name: "/pr", Description: "Create pull request", HasArgs: true},
+		{Name: "/stash", Description: "Git stash management", HasArgs: true},
 	}
 }
 
@@ -208,6 +213,14 @@ func (h *Handler) Handle(input string) Result {
 		return h.statsCmd(args)
 	case "/retry":
 		return h.retryCmd(args)
+	case "/usage":
+		return h.usageCmd(args)
+	case "/branch":
+		return h.branchCmd(args)
+	case "/pr":
+		return h.prCmd(args)
+	case "/stash":
+		return h.stashCmd(args)
 	default:
 		// Try skill invocation
 		if result, ok := h.HandleSkillInvocation(cmd, args); ok {
@@ -219,25 +232,56 @@ func (h *Handler) Handle(input string) Result {
 
 func (h *Handler) help() Result {
 	var b strings.Builder
-	b.WriteString("Available commands:\n")
-	for _, cmd := range AllCommands() {
-		aliases := ""
-		if len(cmd.Aliases) > 0 {
-			aliases = " (" + strings.Join(cmd.Aliases, ", ") + ")"
-		}
-		b.WriteString(fmt.Sprintf("  %-16s %s%s\n", cmd.Name, cmd.Description, aliases))
-	}
-	b.WriteString("\nKeyboard shortcuts:\n")
-	b.WriteString("  Enter            Send message\n")
-	b.WriteString("  Shift+Enter      New line\n")
-	b.WriteString("  Ctrl+C           Cancel query / Exit\n")
-	b.WriteString("  Ctrl+D           Exit (when input empty)\n")
-	b.WriteString("  Ctrl+L           Clear conversation\n")
-	b.WriteString("  Ctrl+O           Toggle expand tool output\n")
-	b.WriteString("  Up/Down          Input history / Scroll\n")
-	b.WriteString("  PgUp/PgDown      Scroll messages\n")
-	b.WriteString("  Esc              Clear input\n")
-	b.WriteString("  ! <cmd>          Run shell command\n")
+
+	b.WriteString("Core:\n")
+	b.WriteString("  /help          Show this help\n")
+	b.WriteString("  /clear         Clear conversation\n")
+	b.WriteString("  /compact       Compact with optional instructions\n")
+	b.WriteString("  /model [name]  Show or change model\n")
+	b.WriteString("  /fast          Toggle faster model\n")
+	b.WriteString("  /plan [task]   Toggle plan mode / plan a task\n")
+	b.WriteString("  /quit          Exit\n")
+
+	b.WriteString("\nGit & Code:\n")
+	b.WriteString("  /commit [msg]  Create git commit\n")
+	b.WriteString("  /review        Code review\n")
+	b.WriteString("  /diff          Show git diff summary\n")
+	b.WriteString("  /branch        Branch management\n")
+	b.WriteString("  /pr [desc]     Create pull request\n")
+	b.WriteString("  /stash         Stash management\n")
+	b.WriteString("  /bug <desc>    Investigate a bug\n")
+	b.WriteString("  /test          Run tests\n")
+
+	b.WriteString("\nTools & Context:\n")
+	b.WriteString("  /mcp           Manage MCP servers\n")
+	b.WriteString("  /skills        List skills\n")
+	b.WriteString("  /plugin        List plugins\n")
+	b.WriteString("  /hooks         Show hooks\n")
+	b.WriteString("  /context       Show context sources\n")
+	b.WriteString("  /init          Initialize project\n")
+
+	b.WriteString("\nSession:\n")
+	b.WriteString("  /cost          Cost and token usage\n")
+	b.WriteString("  /usage         Detailed API usage\n")
+	b.WriteString("  /stats         Session statistics\n")
+	b.WriteString("  /session       Session details\n")
+	b.WriteString("  /files         Files accessed\n")
+	b.WriteString("  /resume        Recent sessions\n")
+	b.WriteString("  /export        Export conversation\n")
+	b.WriteString("  /copy          Copy last response\n")
+	b.WriteString("  /retry         Retry last message\n")
+
+	b.WriteString("\nConfig:\n")
+	b.WriteString("  /config        Show configuration\n")
+	b.WriteString("  /permissions   Permission mode\n")
+	b.WriteString("  /login <key>   Set API key\n")
+	b.WriteString("  /logout        Remove API key\n")
+	b.WriteString("  /doctor        Environment check\n")
+	b.WriteString("  /theme         Color theme\n")
+
+	b.WriteString("\nKeys: Enter send · Shift+Enter newline · Ctrl+C cancel · Ctrl+L clear")
+	b.WriteString("\n      Ctrl+O expand · PgUp/Down scroll · !cmd shell · Tab complete")
+
 	return Result{Message: b.String()}
 }
 

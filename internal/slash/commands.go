@@ -885,6 +885,118 @@ func (h *Handler) retryCmd(args []string) Result {
 	return Result{Message: "No previous user message to retry."}
 }
 
+// ─── /branch ──────────────────────────────────────
+
+func (h *Handler) branchCmd(args []string) Result {
+	if len(args) == 0 {
+		return Result{
+			SkillPrompt: "Show the current git branch and list recent branches. For each branch, show its last commit.",
+		}
+	}
+	action := args[0]
+	switch action {
+	case "new", "create":
+		if len(args) < 2 {
+			return Result{Message: "Usage: /branch new <name>"}
+		}
+		return Result{
+			SkillPrompt: fmt.Sprintf("Create a new git branch named %q from the current branch and switch to it.", args[1]),
+		}
+	case "switch", "checkout":
+		if len(args) < 2 {
+			return Result{Message: "Usage: /branch switch <name>"}
+		}
+		return Result{
+			SkillPrompt: fmt.Sprintf("Switch to git branch %q.", args[1]),
+		}
+	default:
+		return Result{
+			SkillPrompt: fmt.Sprintf("Git branch operation: %s", strings.Join(args, " ")),
+		}
+	}
+}
+
+// ─── /pr ──────────────────────────────────────────
+
+func (h *Handler) prCmd(args []string) Result {
+	desc := strings.Join(args, " ")
+	prompt := "Create a pull request for the current branch."
+	if desc != "" {
+		prompt += fmt.Sprintf("\n\nDescription: %s", desc)
+	}
+	prompt += "\n\nSteps:\n1. Check current branch and diff against main\n2. Push the branch if needed\n3. Create the PR with a good title and description using `gh pr create`"
+	return Result{SkillPrompt: prompt}
+}
+
+// ─── /stash ───────────────────────────────────────
+
+func (h *Handler) stashCmd(args []string) Result {
+	if len(args) == 0 {
+		return Result{
+			SkillPrompt: "Show the current git stash list. If there are stashed changes, show what each stash contains.",
+		}
+	}
+	switch args[0] {
+	case "save", "push":
+		msg := strings.Join(args[1:], " ")
+		if msg == "" {
+			msg = "WIP"
+		}
+		return Result{
+			SkillPrompt: fmt.Sprintf("Stash current changes with message: %q", msg),
+		}
+	case "pop", "apply":
+		return Result{
+			SkillPrompt: "Apply the most recent git stash (pop).",
+		}
+	default:
+		return Result{
+			SkillPrompt: fmt.Sprintf("Git stash operation: %s", strings.Join(args, " ")),
+		}
+	}
+}
+
+// ─── /usage ───────────────────────────────────────
+
+func (h *Handler) usageCmd(args []string) Result {
+	a := h.app.GetAgent()
+	if a == nil {
+		return Result{Message: "No active session."}
+	}
+
+	var b strings.Builder
+	b.WriteString("API usage:\n\n")
+
+	tracker := a.CostTracker()
+	if tracker != nil {
+		b.WriteString(fmt.Sprintf("  Total cost:    %s\n", tracker.FormatCost()))
+		in, out := tracker.TotalTokens()
+		b.WriteString(fmt.Sprintf("  Input tokens:  %d\n", in))
+		b.WriteString(fmt.Sprintf("  Output tokens: %d\n", out))
+		b.WriteString(fmt.Sprintf("  Total tokens:  %d\n", in+out))
+
+		// Per-model breakdown
+		allUsage := tracker.AllModelUsage()
+		if len(allUsage) > 0 {
+			b.WriteString("\n  By model:\n")
+			for model, usage := range allUsage {
+				b.WriteString(fmt.Sprintf("    %s: $%.4f (%d in / %d out)\n",
+					model, usage.CostUSD, usage.InputTokens, usage.OutputTokens))
+			}
+		}
+
+		stats := tracker.Stats()
+		if dur, ok := stats["totalAPIDuration"]; ok {
+			b.WriteString(fmt.Sprintf("\n  API time:      %v\n", dur))
+		}
+		if dur, ok := stats["totalToolDuration"]; ok {
+			b.WriteString(fmt.Sprintf("  Tool time:     %v\n", dur))
+		}
+	}
+
+	return Result{Message: b.String()}
+}
+
 // ─── helpers ──────────────────────────────────────
 
 func min(a, b int) int {
