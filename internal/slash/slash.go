@@ -80,6 +80,11 @@ func AllCommands() []CommandDef {
 		{Name: "/context", Description: "Show all context sources"},
 		{Name: "/session", Description: "Show session details"},
 		{Name: "/files", Description: "List files accessed this session"},
+		// Auth
+		{Name: "/login", Description: "Set API key", HasArgs: true},
+		{Name: "/logout", Description: "Remove stored API key"},
+		// Theme
+		{Name: "/theme", Description: "Switch color theme", HasArgs: true},
 	}
 }
 
@@ -187,6 +192,12 @@ func (h *Handler) Handle(input string) Result {
 		return h.sessionCmd(args)
 	case "/files":
 		return h.filesCmd(args)
+	case "/login":
+		return h.loginCmd(args)
+	case "/logout":
+		return h.logoutCmd(args)
+	case "/theme":
+		return h.themeCmd(args)
 	default:
 		// Try skill invocation
 		if result, ok := h.HandleSkillInvocation(cmd, args); ok {

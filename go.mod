@@ -7,7 +7,7 @@ require (
 	github.com/charmbracelet/bubbletea v1.3.5
 	github.com/charmbracelet/glamour v0.9.1
 	github.com/charmbracelet/lipgloss v1.1.0
-	github.com/codeany-ai/open-agent-sdk-go v0.0.0
+	github.com/codeany-ai/open-agent-sdk-go v0.2.0
 	github.com/muesli/reflow v0.3.0
 	github.com/spf13/cobra v1.9.1
 	gopkg.in/yaml.v3 v3.0.1
@@ -46,5 +46,3 @@ require (
 	golang.org/x/term v0.30.0 // indirect
 	golang.org/x/text v0.23.0 // indirect
 )
-
-replace github.com/codeany-ai/open-agent-sdk-go => ../open-agent-sdk-go

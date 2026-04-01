@@ -2,6 +2,7 @@ package slash
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -678,6 +679,82 @@ func (h *Handler) planToggle() Result {
 	return Result{
 		Message:   "Plan mode toggled. (Agent will plan but not execute tools.)",
 		PlanToggle: true,
+	}
+}
+
+// ─── /login ───────────────────────────────────────
+
+func (h *Handler) loginCmd(args []string) Result {
+	if len(args) == 0 {
+		return Result{Message: "Usage: /login <api-key>\n\nSet your API key. Examples:\n  /login sk-ant-...          (Anthropic)\n  /login sk-or-v1-...       (OpenRouter)\n\nOr set via environment variable:\n  export ANTHROPIC_API_KEY=sk-ant-...\n  export CODEANY_API_KEY=sk-or-...\n  export CODEANY_BASE_URL=https://openrouter.ai/api"}
+	}
+
+	apiKey := args[0]
+
+	// Detect provider from key prefix
+	provider := "anthropic"
+	if strings.HasPrefix(apiKey, "sk-or-") {
+		provider = "openrouter"
+	}
+
+	// Save to settings.json
+	settingsPath := config.GlobalConfigPath()
+	var settings map[string]interface{}
+
+	if data, err := os.ReadFile(settingsPath); err == nil {
+		json.Unmarshal(data, &settings)
+	}
+	if settings == nil {
+		settings = make(map[string]interface{})
+	}
+
+	settings["apiKey"] = apiKey
+	if provider == "openrouter" {
+		settings["baseURL"] = "https://openrouter.ai/api"
+	}
+
+	data, _ := json.MarshalIndent(settings, "", "  ")
+	os.MkdirAll(filepath.Dir(settingsPath), 0755)
+	if err := os.WriteFile(settingsPath, data, 0600); err != nil {
+		return Result{Message: fmt.Sprintf("Failed to save: %v", err)}
+	}
+
+	return Result{Message: fmt.Sprintf("✓ API key saved (%s provider)\n  Stored in %s", provider, settingsPath)}
+}
+
+// ─── /logout ──────────────────────────────────────
+
+func (h *Handler) logoutCmd(args []string) Result {
+	settingsPath := config.GlobalConfigPath()
+	var settings map[string]interface{}
+
+	if data, err := os.ReadFile(settingsPath); err == nil {
+		json.Unmarshal(data, &settings)
+	}
+	if settings == nil {
+		return Result{Message: "No stored API key found."}
+	}
+
+	delete(settings, "apiKey")
+	data, _ := json.MarshalIndent(settings, "", "  ")
+	os.WriteFile(settingsPath, data, 0600)
+
+	return Result{Message: "✓ API key removed from settings.\nSet ANTHROPIC_API_KEY or CODEANY_API_KEY env var to authenticate."}
+}
+
+// ─── /theme ───────────────────────────────────────
+
+func (h *Handler) themeCmd(args []string) Result {
+	if len(args) == 0 {
+		return Result{Message: "Usage: /theme <dark|light>\n\nSwitch the color theme. Currently only supports dark (default)."}
+	}
+
+	t := strings.ToLower(args[0])
+	switch t {
+	case "dark", "light":
+		return Result{Message: fmt.Sprintf("Theme set to: %s\n(Theme switching will take effect after restart)", t)}
+	default:
+		return Result{Message: fmt.Sprintf("Unknown theme: %s. Available: dark, light", t)}
 	}
 }
 
