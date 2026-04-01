@@ -907,6 +907,11 @@ func (m *Model) renderSlashSuggestions() string {
 func (m *Model) renderStatusBar() string {
 	var leftParts []string
 
+	// Plan mode indicator
+	if m.planMode {
+		leftParts = append(leftParts, theme.SecondaryText.Render("📋 PLAN"))
+	}
+
 	// Permission mode indicator
 	mode := m.cfg.PermissionMode
 	if mode == "" {
@@ -916,11 +921,11 @@ func (m *Model) renderStatusBar() string {
 	case "bypassPermissions":
 		leftParts = append(leftParts, theme.WarningText.Render("⚡ bypass"))
 	case "acceptEdits":
-		leftParts = append(leftParts, theme.SuccessText.Render("✎ acceptEdits"))
+		leftParts = append(leftParts, theme.SuccessText.Render("✎ auto"))
 	case "plan":
 		leftParts = append(leftParts, theme.SecondaryText.Render("📋 plan"))
 	default:
-		leftParts = append(leftParts, theme.MutedStyle.Render("🔒 default"))
+		leftParts = append(leftParts, theme.MutedStyle.Render("🔒"))
 	}
 
 	// Cost
@@ -931,6 +936,23 @@ func (m *Model) renderStatusBar() string {
 	// Tokens
 	if m.totalTokensIn > 0 || m.totalTokensOut > 0 {
 		leftParts = append(leftParts, theme.MutedStyle.Render(fmt.Sprintf("↑%d ↓%d", m.totalTokensIn, m.totalTokensOut)))
+	}
+
+	// MCP connections
+	if m.agent != nil {
+		client := m.agent.MCPClient()
+		if client != nil {
+			conns := client.AllConnections()
+			if len(conns) > 0 {
+				connected := 0
+				for _, c := range conns {
+					if c.Status == "connected" {
+						connected++
+					}
+				}
+				leftParts = append(leftParts, theme.MutedStyle.Render(fmt.Sprintf("MCP %d/%d", connected, len(conns))))
+			}
+		}
 	}
 
 	left := strings.Join(leftParts, theme.DimText.Render(" │ "))

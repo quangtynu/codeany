@@ -758,6 +758,133 @@ func (h *Handler) themeCmd(args []string) Result {
 	}
 }
 
+// ─── /copy ────────────────────────────────────────
+
+func (h *Handler) copyCmd(args []string) Result {
+	a := h.app.GetAgent()
+	if a == nil {
+		return Result{Message: "No conversation to copy from."}
+	}
+
+	msgs := a.GetMessages()
+	// Find last assistant message
+	var lastText string
+	for i := len(msgs) - 1; i >= 0; i-- {
+		if msgs[i].Role == "assistant" {
+			for _, block := range msgs[i].Content {
+				if block.Text != "" {
+					lastText = block.Text
+					break
+				}
+			}
+			if lastText != "" {
+				break
+			}
+		}
+	}
+
+	if lastText == "" {
+		return Result{Message: "No assistant response to copy."}
+	}
+
+	// Copy to clipboard
+	var cmd *exec.Cmd
+	switch runtime.GOOS {
+	case "darwin":
+		cmd = exec.Command("pbcopy")
+	case "linux":
+		cmd = exec.Command("xclip", "-selection", "clipboard")
+	default:
+		return Result{Message: "Clipboard not supported on this platform."}
+	}
+
+	cmd.Stdin = strings.NewReader(lastText)
+	if err := cmd.Run(); err != nil {
+		return Result{Message: fmt.Sprintf("Failed to copy: %v", err)}
+	}
+
+	preview := lastText
+	if len(preview) > 80 {
+		preview = preview[:80] + "..."
+	}
+	return Result{Message: fmt.Sprintf("✓ Copied to clipboard (%d chars)\n  %s", len(lastText), preview)}
+}
+
+// ─── /stats ───────────────────────────────────────
+
+func (h *Handler) statsCmd(args []string) Result {
+	a := h.app.GetAgent()
+	if a == nil {
+		return Result{Message: "No active session."}
+	}
+
+	var b strings.Builder
+	b.WriteString("Session statistics:\n\n")
+
+	msgs := a.GetMessages()
+	userMsgs := 0
+	assistantMsgs := 0
+	toolCalls := 0
+	toolTypes := make(map[string]int)
+
+	for _, msg := range msgs {
+		switch msg.Role {
+		case "user":
+			userMsgs++
+		case "assistant":
+			assistantMsgs++
+			for _, block := range msg.Content {
+				if block.Type == "tool_use" {
+					toolCalls++
+					toolTypes[block.Name]++
+				}
+			}
+		}
+	}
+
+	b.WriteString(fmt.Sprintf("  Messages:    %d user, %d assistant\n", userMsgs, assistantMsgs))
+	b.WriteString(fmt.Sprintf("  Tool calls:  %d total\n", toolCalls))
+
+	if len(toolTypes) > 0 {
+		b.WriteString("  By tool:\n")
+		for name, count := range toolTypes {
+			b.WriteString(fmt.Sprintf("    %-12s %d\n", name, count))
+		}
+	}
+
+	b.WriteString(fmt.Sprintf("\n  Cost:        $%.4f\n", h.app.GetCost()))
+	b.WriteString(fmt.Sprintf("  Tokens in:   %d\n", h.app.GetTokensIn()))
+	b.WriteString(fmt.Sprintf("  Tokens out:  %d\n", h.app.GetTokensOut()))
+
+	return Result{Message: b.String()}
+}
+
+// ─── /retry ───────────────────────────────────────
+
+func (h *Handler) retryCmd(args []string) Result {
+	a := h.app.GetAgent()
+	if a == nil {
+		return Result{Message: "No conversation."}
+	}
+
+	msgs := a.GetMessages()
+	// Find last user message
+	for i := len(msgs) - 1; i >= 0; i-- {
+		if msgs[i].Role == "user" {
+			for _, block := range msgs[i].Content {
+				if block.Text != "" {
+					return Result{
+						Message:     "Retrying last message...",
+						SkillPrompt: block.Text,
+					}
+				}
+			}
+		}
+	}
+
+	return Result{Message: "No previous user message to retry."}
+}
+
 // ─── helpers ──────────────────────────────────────
 
 func min(a, b int) int {

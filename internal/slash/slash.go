@@ -85,6 +85,10 @@ func AllCommands() []CommandDef {
 		{Name: "/logout", Description: "Remove stored API key"},
 		// Theme
 		{Name: "/theme", Description: "Switch color theme", HasArgs: true},
+		// Utilities
+		{Name: "/copy", Description: "Copy last response to clipboard"},
+		{Name: "/stats", Description: "Detailed session statistics"},
+		{Name: "/retry", Description: "Retry last message"},
 	}
 }
 
@@ -198,6 +202,12 @@ func (h *Handler) Handle(input string) Result {
 		return h.logoutCmd(args)
 	case "/theme":
 		return h.themeCmd(args)
+	case "/copy":
+		return h.copyCmd(args)
+	case "/stats":
+		return h.statsCmd(args)
+	case "/retry":
+		return h.retryCmd(args)
 	default:
 		// Try skill invocation
 		if result, ok := h.HandleSkillInvocation(cmd, args); ok {
