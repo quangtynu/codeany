@@ -16,6 +16,8 @@ import (
 	"github.com/codeany-ai/codeany/internal/plugins"
 	"github.com/codeany-ai/codeany/internal/session"
 	"github.com/codeany-ai/codeany/internal/skills"
+	"github.com/codeany-ai/codeany/internal/team"
+	"github.com/codeany-ai/codeany/internal/worktree"
 	"github.com/codeany-ai/open-agent-sdk-go/mcp"
 )
 
@@ -1105,6 +1107,151 @@ var rng = newRNG()
 
 func newRNG() *rand.Rand {
 	return rand.New(rand.NewSource(time.Now().UnixNano()))
+}
+
+// ─── /team ────────────────────────────────────────
+
+func (h *Handler) teamCmd(args []string) Result {
+	configDir := config.GlobalConfigDir()
+
+	if len(args) == 0 {
+		teams := team.ListTeams(configDir)
+		return Result{Message: team.FormatTeamList(teams)}
+	}
+
+	switch args[0] {
+	case "create":
+		if len(args) < 2 {
+			return Result{Message: "Usage: /team create <name> [description]"}
+		}
+		name := args[1]
+		desc := strings.Join(args[2:], " ")
+		t, err := team.Create(configDir, name, desc)
+		if err != nil {
+			return Result{Message: fmt.Sprintf("Failed to create team: %v", err)}
+		}
+		return Result{Message: fmt.Sprintf("✓ Team %q created with lead agent\n  Dir: %s", t.Name, filepath.Join(team.TeamsDir(configDir), name))}
+
+	case "add":
+		if len(args) < 3 {
+			return Result{Message: "Usage: /team add <team> <agent-name> [type]"}
+		}
+		t, err := team.Load(configDir, args[1])
+		if err != nil {
+			return Result{Message: fmt.Sprintf("Team %q not found.", args[1])}
+		}
+		agentType := "general-purpose"
+		if len(args) > 3 {
+			agentType = args[3]
+		}
+		t.AddMember(args[2], agentType, "")
+		return Result{Message: fmt.Sprintf("✓ Added %s to team %s", args[2], t.Name)}
+
+	case "delete", "remove":
+		if len(args) < 2 {
+			return Result{Message: "Usage: /team delete <name>"}
+		}
+		if err := team.Delete(configDir, args[1]); err != nil {
+			return Result{Message: fmt.Sprintf("Failed to delete team: %v", err)}
+		}
+		return Result{Message: fmt.Sprintf("✓ Team %q deleted", args[1])}
+
+	case "send":
+		if len(args) < 4 {
+			return Result{Message: "Usage: /team send <team> <agent> <message>"}
+		}
+		teamName := args[1]
+		agentName := args[2]
+		msg := strings.Join(args[3:], " ")
+		if err := team.SendMsg(configDir, teamName, "user", agentName, msg); err != nil {
+			return Result{Message: fmt.Sprintf("Failed to send: %v", err)}
+		}
+		return Result{Message: fmt.Sprintf("✓ Message sent to %s in team %s", agentName, teamName)}
+
+	case "inbox":
+		if len(args) < 3 {
+			return Result{Message: "Usage: /team inbox <team> <agent>"}
+		}
+		messages := team.ReadInbox(configDir, args[1], args[2])
+		if len(messages) == 0 {
+			return Result{Message: "No unread messages."}
+		}
+		var b strings.Builder
+		b.WriteString(fmt.Sprintf("Inbox for %s (%d messages):\n\n", args[2], len(messages)))
+		for _, m := range messages {
+			b.WriteString(fmt.Sprintf("  [%s] %s: %s\n", m.Timestamp.Format("15:04"), m.From, m.Text))
+		}
+		return Result{Message: b.String()}
+
+	default:
+		return Result{Message: "Usage: /team [create|add|delete|send|inbox]\n\n/team              List teams\n/team create <n>   Create team\n/team add <t> <a>  Add agent\n/team delete <n>   Delete team\n/team send <t> <a> Send message\n/team inbox <t> <a> Read inbox"}
+	}
+}
+
+// ─── /worktree ────────────────────────────────────
+
+func (h *Handler) worktreeCmd(args []string) Result {
+	configDir := config.GlobalConfigDir()
+
+	if len(args) == 0 {
+		wts := worktree.ListAll(configDir)
+		if len(wts) == 0 {
+			return Result{Message: "No worktrees.\n\nCreate one with: /worktree enter <name>"}
+		}
+		var b strings.Builder
+		b.WriteString("Worktrees:\n\n")
+		for _, wt := range wts {
+			b.WriteString(fmt.Sprintf("  %s → %s (branch: %s)\n", wt.Name, wt.Path, wt.Branch))
+		}
+		return Result{Message: b.String()}
+	}
+
+	switch args[0] {
+	case "enter", "create":
+		name := "work"
+		if len(args) > 1 {
+			name = args[1]
+		}
+		a := h.app.GetAgent()
+		sessionID := "unknown"
+		if a != nil {
+			sessionID = a.SessionID()
+		}
+		wt, err := worktree.Create(configDir, name, sessionID)
+		if err != nil {
+			return Result{Message: fmt.Sprintf("Failed to create worktree: %v", err)}
+		}
+		if err := wt.Enter(); err != nil {
+			return Result{Message: fmt.Sprintf("Failed to enter worktree: %v", err)}
+		}
+		return Result{Message: fmt.Sprintf("✓ Entered worktree %q\n  Branch: %s\n  Path: %s\n\nUse /worktree exit to return.", name, wt.Branch, wt.Path)}
+
+	case "exit", "leave":
+		a := h.app.GetAgent()
+		sessionID := "unknown"
+		if a != nil {
+			sessionID = a.SessionID()
+		}
+		wt := worktree.LoadActive(configDir, sessionID)
+		if wt == nil {
+			return Result{Message: "Not in a worktree."}
+		}
+		remove := false
+		if len(args) > 1 && (args[1] == "--remove" || args[1] == "-r") {
+			remove = true
+		}
+		if err := wt.Exit(remove); err != nil {
+			return Result{Message: fmt.Sprintf("Failed to exit worktree: %v", err)}
+		}
+		msg := fmt.Sprintf("✓ Returned to %s", wt.OriginalCWD)
+		if remove {
+			msg += " (worktree removed)"
+		}
+		return Result{Message: msg}
+
+	default:
+		return Result{Message: "Usage: /worktree [enter|exit]\n\n/worktree             List worktrees\n/worktree enter <n>   Create & enter worktree\n/worktree exit [-r]   Exit (--remove to delete)"}
+	}
 }
 
 // ─── helpers ──────────────────────────────────────

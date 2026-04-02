@@ -107,6 +107,9 @@ func AllCommands() []CommandDef {
 		{Name: "/vim", Description: "Toggle vim mode"},
 		{Name: "/feedback", Description: "Report bugs or feedback"},
 		{Name: "/tips", Description: "Show a random tip"},
+		// Multi-agent
+		{Name: "/team", Description: "Team management (create, add, send, inbox)", HasArgs: true},
+		{Name: "/worktree", Description: "Git worktree isolation (enter, exit)", HasArgs: true},
 	}
 }
 
@@ -250,6 +253,10 @@ func (h *Handler) Handle(input string) Result {
 		return h.feedbackCmd(args)
 	case "/tips":
 		return h.tipsCmd(args)
+	case "/team":
+		return h.teamCmd(args)
+	case "/worktree":
+		return h.worktreeCmd(args)
 	default:
 		// Try skill invocation
 		if result, ok := h.HandleSkillInvocation(cmd, args); ok {
@@ -304,9 +311,13 @@ func (h *Handler) help() Result {
 	b.WriteString("  /copy          Copy last response\n")
 	b.WriteString("  /retry         Retry last message\n")
 
+	b.WriteString("\nMulti-agent:\n")
+	b.WriteString("  /team          Team management (create, add, send, inbox)\n")
+	b.WriteString("  /worktree      Git worktree isolation (enter, exit)\n")
+
 	b.WriteString("\nConfig:\n")
 	b.WriteString("  /config        Show configuration\n")
-	b.WriteString("  /permissions   Permission mode\n")
+	b.WriteString("  /permissions   Permission mode (bypass/auto/default/plan)\n")
 	b.WriteString("  /login <key>   Set API key\n")
 	b.WriteString("  /logout        Remove API key\n")
 	b.WriteString("  /doctor        Environment check\n")
