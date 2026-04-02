@@ -211,12 +211,8 @@ func (m *Model) initAgent() tea.Cmd {
 			AllowedTools:       m.cfg.AllowedTools,
 		}
 
-		pm := m.cfg.GetPermissionMode()
-		if pm == types.PermissionModeBypassPermissions {
-			opts.PermissionMode = types.PermissionModeBypassPermissions
-		} else {
-			opts.CanUseTool = m.createPermissionCallback()
-		}
+		// Always use our interactive callback — it checks mode internally
+		opts.CanUseTool = m.createPermissionCallback()
 
 		a := agent.New(opts)
 		m.agent = a
@@ -236,18 +232,44 @@ func (m *Model) initAgent() tea.Cmd {
 }
 
 func (m *Model) createPermissionCallback() types.CanUseToolFn {
+	allow := &types.PermissionDecision{Behavior: types.PermissionAllow}
+
 	return func(tool types.Tool, input map[string]interface{}) (*types.PermissionDecision, error) {
-		// Check persisted rules first
+		mode := m.cfg.GetPermissionMode()
+
+		// bypassPermissions: allow everything, no questions asked
+		if mode == types.PermissionModeBypassPermissions {
+			return allow, nil
+		}
+
+		// Check persisted "always allow" rules
 		if m.permRules.IsAllowed(tool.Name()) {
-			return &types.PermissionDecision{Behavior: types.PermissionAllow}, nil
+			return allow, nil
 		}
 
-		// Read-only auto-approve in acceptEdits mode
-		if m.cfg.GetPermissionMode() == types.PermissionModeAcceptEdits && tool.IsReadOnly(input) {
-			return &types.PermissionDecision{Behavior: types.PermissionAllow}, nil
+		// acceptEdits: auto-approve read-only tools + file edit tools
+		if mode == types.PermissionModeAcceptEdits {
+			if tool.IsReadOnly(input) {
+				return allow, nil
+			}
+			// Also auto-approve Edit, Write (the "edits" in acceptEdits)
+			switch tool.Name() {
+			case "Edit", "Write", "Bash":
+				return allow, nil
+			}
 		}
 
-		// Ask user via TUI
+		// plan mode: allow all tools (planning can read/analyze)
+		if mode == types.PermissionModePlan {
+			return allow, nil
+		}
+
+		// default mode: auto-approve read-only tools, ask for write tools
+		if tool.IsReadOnly(input) {
+			return allow, nil
+		}
+
+		// Ask user via TUI for write operations
 		respCh := make(chan *types.PermissionDecision, 1)
 		if m.program != nil {
 			m.program.Send(permissionRequestMsg{
@@ -256,7 +278,7 @@ func (m *Model) createPermissionCallback() types.CanUseToolFn {
 				respCh:   respCh,
 			})
 		} else {
-			return &types.PermissionDecision{Behavior: types.PermissionAllow}, nil
+			return allow, nil
 		}
 
 		select {

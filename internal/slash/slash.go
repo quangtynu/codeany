@@ -370,18 +370,52 @@ func (h *Handler) showConfig() Result {
 func (h *Handler) permissions(args []string) Result {
 	if len(args) == 0 {
 		cfg := h.app.GetConfig()
+		mode := cfg.PermissionMode
+		if mode == "" {
+			mode = "default"
+		}
+		indicator := map[string]string{
+			"default":           "🔒 Asks for write operations",
+			"acceptEdits":       "✎  Auto-approves all file edits + bash",
+			"bypassPermissions": "⚡ Allows everything (no prompts)",
+			"plan":              "📋 Plan only, no execution",
+		}
+		desc := indicator[mode]
 		return Result{
-			Message: fmt.Sprintf("Current mode: %s\n\nAvailable modes:\n  default           Ask for each tool\n  acceptEdits       Auto-approve read-only tools\n  bypassPermissions Skip all prompts\n  plan              Plan mode (no execution)", cfg.PermissionMode),
+			Message: fmt.Sprintf("Current mode: %s — %s\n\nSwitch with:\n  /permissions bypass     Skip all prompts\n  /permissions default    Ask for write ops\n  /permissions auto       Auto-approve edits\n  /permissions plan       Plan only", mode, desc),
 		}
 	}
 
 	mode := args[0]
+	// Aliases for convenience
+	switch strings.ToLower(mode) {
+	case "bypass", "bypasspermissions", "off", "y", "yes":
+		mode = "bypassPermissions"
+	case "auto", "acceptedits", "accept":
+		mode = "acceptEdits"
+	case "default", "on", "ask":
+		mode = "default"
+	case "plan":
+		mode = "plan"
+	}
+
 	switch mode {
 	case "default", "acceptEdits", "bypassPermissions", "plan":
 		h.app.SetPermissionMode(mode)
-		return Result{Message: fmt.Sprintf("Permission mode changed to: %s", mode)}
+		indicator := ""
+		switch mode {
+		case "bypassPermissions":
+			indicator = " ⚡ All tools auto-approved"
+		case "acceptEdits":
+			indicator = " ✎ File edits auto-approved"
+		case "plan":
+			indicator = " 📋 Plan only mode"
+		case "default":
+			indicator = " 🔒 Will ask for write operations"
+		}
+		return Result{Message: fmt.Sprintf("Permission mode: %s%s", mode, indicator)}
 	default:
-		return Result{Message: fmt.Sprintf("Unknown permission mode: %s", mode)}
+		return Result{Message: fmt.Sprintf("Unknown mode: %s\nUse: bypass, auto, default, plan", mode)}
 	}
 }
 
