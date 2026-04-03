@@ -33,7 +33,13 @@ type Config struct {
 	PermissionMode string `json:"permissionMode,omitempty"`
 
 	// Tool settings
-	AllowedTools []string `json:"allowedTools,omitempty"`
+	AllowedTools    []string `json:"allowedTools,omitempty"`
+	DisallowedTools []string `json:"disallowedTools,omitempty"`
+
+	// Advanced
+	FallbackModel          string `json:"fallbackModel,omitempty"`
+	Effort                 string `json:"effort,omitempty"` // "low", "medium", "high", "max"
+	EnableFileCheckpointing bool  `json:"enableFileCheckpointing,omitempty"`
 
 	// MCP servers
 	MCPServers map[string]types.MCPServerConfig `json:"mcpServers,omitempty"`

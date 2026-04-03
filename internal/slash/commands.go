@@ -1301,6 +1301,29 @@ func (h *Handler) worktreeCmd(args []string) Result {
 	}
 }
 
+// ─── /effort ──────────────────────────────────────
+
+func (h *Handler) effortCmd(args []string) Result {
+	if len(args) == 0 {
+		cfg := h.app.GetConfig()
+		current := cfg.Effort
+		if current == "" {
+			current = "(default)"
+		}
+		return Result{Message: fmt.Sprintf("Current effort: %s\n\nAvailable levels:\n  /effort low      Fast, concise responses\n  /effort medium   Balanced (default)\n  /effort high     Thorough analysis\n  /effort max      Maximum reasoning depth", current)}
+	}
+
+	level := strings.ToLower(args[0])
+	switch level {
+	case "low", "medium", "high", "max":
+		cfg := h.app.GetConfig()
+		cfg.Effort = level
+		return Result{Message: fmt.Sprintf("Effort level set to: %s\n(Takes effect on next query)", level)}
+	default:
+		return Result{Message: fmt.Sprintf("Unknown effort level: %s\nUse: low, medium, high, max", level)}
+	}
+}
+
 // ─── /btw ─────────────────────────────────────────
 
 func (h *Handler) btwCmd(args []string) Result {

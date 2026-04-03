@@ -32,8 +32,8 @@ github.com/charmbracelet/x/exp/golden v0.0.0-20241011142426-46044092ad91 h1:payR
 github.com/charmbracelet/x/exp/golden v0.0.0-20241011142426-46044092ad91/go.mod h1:wDlXFlCrmJ8J+swcL/MnGUuYnqgQdW9rhSD61oNMb6U=
 github.com/charmbracelet/x/term v0.2.1 h1:AQeHeLZ1OqSXhrAWpYUtZyX1T3zVxfpZuEQMIQaGIAQ=
 github.com/charmbracelet/x/term v0.2.1/go.mod h1:oQ4enTYFV7QN4m0i9mzHrViD7TQKvNEEkHUMCmsxdUg=
-github.com/codeany-ai/open-agent-sdk-go v0.4.1 h1:sifjkB79SwgiJDDTaU65whTtKoddisT2i0zkQ68m04Y=
-github.com/codeany-ai/open-agent-sdk-go v0.4.1/go.mod h1:j9P9/i2oWLD0iMB73vZ6IllaQ9FzgG0LAdPmnqb9VOw=
+github.com/codeany-ai/open-agent-sdk-go v0.5.0 h1:UJd5HwlB01udnIHnYAimO1iOXqkItofNSuGMH5keT00=
+github.com/codeany-ai/open-agent-sdk-go v0.5.0/go.mod h1:j9P9/i2oWLD0iMB73vZ6IllaQ9FzgG0LAdPmnqb9VOw=
 github.com/cpuguy83/go-md2man/v2 v2.0.6/go.mod h1:oOW0eioCTA6cOiMLiUPZOpcVxMig6NIQQ7OS05n1F4g=
 github.com/dlclark/regexp2 v1.11.0 h1:G/nrcoOa7ZXlpoa/91N3X7mM3r8eIlMBBJZvsz/mxKI=
 github.com/dlclark/regexp2 v1.11.0/go.mod h1:DHkYz0B9wPfa6wondMfaivmHpzrQ3v9q8cnmRbL6yW8=

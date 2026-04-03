@@ -113,6 +113,8 @@ func AllCommands() []CommandDef {
 		{Name: "/worktree", Description: "Git worktree isolation (enter, exit)", HasArgs: true},
 		// Mid-query
 		{Name: "/btw", Description: "Side question (queued during execution)", HasArgs: true},
+		// Reasoning
+		{Name: "/effort", Description: "Set reasoning effort (low/medium/high/max)", HasArgs: true},
 	}
 }
 
@@ -262,6 +264,8 @@ func (h *Handler) Handle(input string) Result {
 		return h.worktreeCmd(args)
 	case "/btw":
 		return h.btwCmd(args)
+	case "/effort":
+		return h.effortCmd(args)
 	default:
 		// Try skill invocation
 		if result, ok := h.HandleSkillInvocation(cmd, args); ok {

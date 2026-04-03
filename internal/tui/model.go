@@ -215,20 +215,24 @@ func (m *Model) initAgent() tea.Cmd {
 		}
 
 		opts := agent.Options{
-			Model:              m.cfg.Model,
-			APIKey:             m.cfg.APIKey,
-			BaseURL:            m.cfg.BaseURL,
-			Provider:           m.cfg.Provider,
-			CWD:                cwd,
-			MaxTurns:           m.cfg.MaxTurns,
-			MaxBudgetUSD:       m.cfg.MaxBudgetUSD,
-			MCPServers:         m.cfg.MCPServers,
-			SystemPrompt:       m.cfg.SystemPrompt,
-			AppendSystemPrompt: appendPrompt,
-			CustomHeaders:      m.cfg.CustomHeaders,
-			ProxyURL:           m.cfg.ProxyURL,
-			AllowedTools:       m.cfg.AllowedTools,
-			Hooks:              buildHooksConfig(m.cfg),
+			Model:                  m.cfg.Model,
+			APIKey:                 m.cfg.APIKey,
+			BaseURL:                m.cfg.BaseURL,
+			Provider:               m.cfg.Provider,
+			CWD:                    cwd,
+			MaxTurns:               m.cfg.MaxTurns,
+			MaxBudgetUSD:           m.cfg.MaxBudgetUSD,
+			MCPServers:             m.cfg.MCPServers,
+			SystemPrompt:           m.cfg.SystemPrompt,
+			AppendSystemPrompt:     appendPrompt,
+			CustomHeaders:          m.cfg.CustomHeaders,
+			ProxyURL:               m.cfg.ProxyURL,
+			AllowedTools:           m.cfg.AllowedTools,
+			DisallowedTools:        m.cfg.DisallowedTools,
+			FallbackModel:          m.cfg.FallbackModel,
+			Effort:                 agent.Effort(m.cfg.Effort),
+			EnableFileCheckpointing: m.cfg.EnableFileCheckpointing,
+			Hooks:                  buildHooksConfig(m.cfg),
 		}
 
 		// Always use our interactive callback — it checks mode internally
