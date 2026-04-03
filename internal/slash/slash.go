@@ -30,6 +30,7 @@ type Result struct {
 	PlanToggle    bool   // Toggle plan mode
 	SessionTitle  string // Rename current session
 	VimToggle     bool   // Toggle vim mode
+	StartLogin    bool   // Start interactive login wizard
 }
 
 // CommandDef defines a slash command with metadata

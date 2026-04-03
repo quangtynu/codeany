@@ -714,18 +714,32 @@ func (h *Handler) planToggle() Result {
 
 func (h *Handler) loginCmd(args []string) Result {
 	if len(args) == 0 {
-		return Result{Message: "Usage: /login <api-key>\n\nSet your API key. Examples:\n  /login sk-ant-...          (Anthropic)\n  /login sk-or-v1-...       (OpenRouter)\n\nOr set via environment variable:\n  export ANTHROPIC_API_KEY=sk-ant-...\n  export CODEANY_API_KEY=sk-or-...\n  export CODEANY_BASE_URL=https://openrouter.ai/api"}
+		// Start interactive wizard
+		return Result{StartLogin: true}
 	}
 
+	// Quick mode: /login <api-key>
 	apiKey := args[0]
+	return saveAPIKey(apiKey)
+}
 
-	// Detect provider from key prefix
+// saveAPIKey saves an API key and auto-detects provider
+func saveAPIKey(apiKey string) Result {
 	provider := "anthropic"
+	baseURL := ""
 	if strings.HasPrefix(apiKey, "sk-or-") {
 		provider = "openrouter"
+		baseURL = "https://openrouter.ai/api"
+	} else if strings.HasPrefix(apiKey, "sk-") && !strings.HasPrefix(apiKey, "sk-ant-") {
+		provider = "openai"
+		baseURL = "https://api.openai.com/v1"
 	}
 
-	// Save to settings.json
+	return SaveProviderConfig(provider, apiKey, baseURL, "")
+}
+
+// SaveProviderConfig writes provider config to settings.json
+func SaveProviderConfig(provider, apiKey, baseURL, model string) Result {
 	settingsPath := config.GlobalConfigPath()
 	var settings map[string]interface{}
 
@@ -737,8 +751,16 @@ func (h *Handler) loginCmd(args []string) Result {
 	}
 
 	settings["apiKey"] = apiKey
-	if provider == "openrouter" {
-		settings["baseURL"] = "https://openrouter.ai/api"
+	if provider == "openai" || provider == "openrouter" || provider == "custom" {
+		settings["provider"] = "openai"
+	} else {
+		settings["provider"] = "anthropic"
+	}
+	if baseURL != "" {
+		settings["baseURL"] = baseURL
+	}
+	if model != "" {
+		settings["model"] = model
 	}
 
 	data, _ := json.MarshalIndent(settings, "", "  ")
@@ -747,7 +769,7 @@ func (h *Handler) loginCmd(args []string) Result {
 		return Result{Message: fmt.Sprintf("Failed to save: %v", err)}
 	}
 
-	return Result{Message: fmt.Sprintf("✓ API key saved (%s provider)\n  Stored in %s", provider, settingsPath)}
+	return Result{Message: fmt.Sprintf("✓ Logged in (%s)\n  Stored in %s\n  Restart codeany to apply changes.", provider, settingsPath)}
 }
 
 // ─── /logout ──────────────────────────────────────

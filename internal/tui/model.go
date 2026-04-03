@@ -33,6 +33,7 @@ const (
 	stateInput
 	stateQuerying
 	statePermission
+	stateLogin // interactive login wizard
 )
 
 // Tea messages
@@ -130,6 +131,19 @@ type Model struct {
 
 	// Queued messages (typed during query execution)
 	queuedMessages []string
+
+	// Login wizard state
+	loginWizard *LoginWizard
+}
+
+// LoginWizard tracks the multi-step login flow
+type LoginWizard struct {
+	Step         int    // 0=provider, 1=apikey, 2=baseurl, 3=model, 4=name
+	Provider     string // "anthropic", "openai", "openrouter", "custom"
+	ProviderName string // display name (for custom)
+	APIKey       string
+	BaseURL      string
+	Model        string
 }
 
 // DisplayBlock represents one visual block in the conversation
@@ -485,8 +499,9 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case statePermission:
 		return m.handlePermissionKey(msg)
 	case stateQuerying:
-		// Allow scrolling and typing during query
 		return m.handleQueryingKey(msg)
+	case stateLogin:
+		return m.handleLoginKey(msg)
 	}
 
 	return m, nil
@@ -664,8 +679,15 @@ func (m *Model) handleInputKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 					Type: "system", Content: "Vim mode toggled (visual indicator only in this version)", Timestamp: time.Now(),
 				})
 			}
+			// Start login wizard
+			if result.StartLogin {
+				m.loginWizard = &LoginWizard{Step: 0}
+				m.state = stateLogin
+				m.input.Focus()
+				m.refreshViewport()
+				return m, nil
+			}
 			m.refreshViewport()
-			// If the command produced a prompt for the agent, send it
 			if result.SkillPrompt != "" {
 				return m, m.sendQuery(result.SkillPrompt)
 			}
@@ -902,6 +924,8 @@ func (m *Model) View() string {
 		if len(m.queuedMessages) > 0 {
 			b.WriteString(theme.DimText.Render(fmt.Sprintf("  (%d queued)", len(m.queuedMessages))))
 		}
+	case stateLogin:
+		b.WriteString(m.renderLoginWizard())
 	case stateInit:
 		b.WriteString(fmt.Sprintf("  %s Initializing...", m.spinner.View()))
 	default:
@@ -1461,6 +1485,194 @@ func (m *Model) SetPermissionMode(mode string) {
 }
 func (m *Model) SendPrompt(prompt string) {
 	// Handled via SkillPrompt in handleInputKey
+}
+
+// ─── Login Wizard ───────────────────────────────
+
+func (m *Model) handleLoginKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.loginWizard == nil {
+		m.state = stateInput
+		return m, nil
+	}
+
+	// Esc to cancel
+	if msg.String() == "esc" {
+		m.loginWizard = nil
+		m.state = stateInput
+		m.input.Reset()
+		m.blocks = append(m.blocks, DisplayBlock{
+			Type: "system", Content: "Login cancelled.", Timestamp: time.Now(),
+		})
+		m.refreshViewport()
+		return m, nil
+	}
+
+	w := m.loginWizard
+
+	switch w.Step {
+	case 0: // Provider selection (1-4)
+		switch msg.String() {
+		case "1":
+			w.Provider = "anthropic"
+			w.BaseURL = "https://api.anthropic.com"
+			w.Step = 1
+			m.input.Reset()
+		case "2":
+			w.Provider = "openai"
+			w.BaseURL = "https://api.openai.com/v1"
+			w.Step = 1
+			m.input.Reset()
+		case "3":
+			w.Provider = "openrouter"
+			w.BaseURL = "https://openrouter.ai/api"
+			w.Step = 1
+			m.input.Reset()
+		case "4":
+			w.Provider = "custom"
+			w.Step = 4 // name first
+			m.input.Reset()
+		}
+		m.refreshViewport()
+		return m, nil
+
+	case 1: // API Key
+		submitted, cmd := m.input.Update(msg)
+		if submitted {
+			w.APIKey = m.input.Value()
+			m.input.Reset()
+			if w.Provider == "custom" {
+				w.Step = 2 // base URL
+			} else {
+				w.Step = 3 // model
+			}
+			m.refreshViewport()
+			return m, nil
+		}
+		return m, cmd
+
+	case 2: // Base URL (custom only)
+		submitted, cmd := m.input.Update(msg)
+		if submitted {
+			w.BaseURL = m.input.Value()
+			m.input.Reset()
+			w.Step = 3 // model
+			m.refreshViewport()
+			return m, nil
+		}
+		return m, cmd
+
+	case 3: // Model name
+		submitted, cmd := m.input.Update(msg)
+		if submitted {
+			w.Model = m.input.Value()
+			m.input.Reset()
+			// Done! Save config
+			m.finishLogin()
+			return m, nil
+		}
+		return m, cmd
+
+	case 4: // Provider name (custom)
+		submitted, cmd := m.input.Update(msg)
+		if submitted {
+			w.ProviderName = m.input.Value()
+			m.input.Reset()
+			w.Step = 1 // API key
+			m.refreshViewport()
+			return m, nil
+		}
+		return m, cmd
+	}
+
+	return m, nil
+}
+
+func (m *Model) finishLogin() {
+	w := m.loginWizard
+
+	result := slash.SaveProviderConfig(w.Provider, w.APIKey, w.BaseURL, w.Model)
+
+	m.blocks = append(m.blocks, DisplayBlock{
+		Type: "system", Content: result.Message, Timestamp: time.Now(),
+	})
+
+	m.loginWizard = nil
+	m.state = stateInput
+	m.input.Focus()
+	m.refreshViewport()
+}
+
+func (m *Model) renderLoginWizard() string {
+	if m.loginWizard == nil {
+		return ""
+	}
+
+	w := m.loginWizard
+	boxStyle := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(theme.Secondary).
+		Padding(0, 1).
+		MarginLeft(2).
+		Width(60)
+
+	title := theme.SecondaryText.Bold(true).Render("Login Setup")
+	var content string
+
+	switch w.Step {
+	case 0:
+		content = title + "\n\n" +
+			"  Select a provider:\n\n" +
+			theme.PrimaryText.Render("  [1]") + " Anthropic (Claude)\n" +
+			theme.PrimaryText.Render("  [2]") + " OpenAI (GPT)\n" +
+			theme.PrimaryText.Render("  [3]") + " OpenRouter (200+ models)\n" +
+			theme.PrimaryText.Render("  [4]") + " Custom provider\n\n" +
+			theme.DimText.Render("  Press 1-4 to select, Esc to cancel")
+
+	case 1:
+		provLabel := w.Provider
+		if w.ProviderName != "" {
+			provLabel = w.ProviderName
+		}
+		content = title + fmt.Sprintf(" — %s", provLabel) + "\n\n" +
+			"  Enter your API key:\n\n" +
+			m.input.View() + "\n\n" +
+			theme.DimText.Render("  Press Enter to continue, Esc to cancel")
+
+	case 2:
+		content = title + " — Base URL\n\n" +
+			"  Enter the API base URL:\n" +
+			theme.DimText.Render("  (e.g., https://api.example.com/v1)") + "\n\n" +
+			m.input.View() + "\n\n" +
+			theme.DimText.Render("  Press Enter to continue, Esc to cancel")
+
+	case 3:
+		defaultModel := ""
+		switch w.Provider {
+		case "anthropic":
+			defaultModel = "sonnet-4-6"
+		case "openai":
+			defaultModel = "gpt-4o"
+		case "openrouter":
+			defaultModel = "anthropic/claude-sonnet-4-5"
+		}
+		hint := ""
+		if defaultModel != "" {
+			hint = fmt.Sprintf("\n  %s", theme.DimText.Render("(e.g., "+defaultModel+")"))
+		}
+		content = title + " — Model\n\n" +
+			"  Enter the default model name:" + hint + "\n\n" +
+			m.input.View() + "\n\n" +
+			theme.DimText.Render("  Press Enter to finish, Esc to cancel")
+
+	case 4:
+		content = title + " — Custom Provider\n\n" +
+			"  Enter provider name:\n" +
+			theme.DimText.Render("  (e.g., deepseek, together, groq)") + "\n\n" +
+			m.input.View() + "\n\n" +
+			theme.DimText.Render("  Press Enter to continue, Esc to cancel")
+	}
+
+	return boxStyle.Render(content)
 }
 
 // ─── Conversation Persistence ───────────────────
