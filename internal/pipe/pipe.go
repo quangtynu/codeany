@@ -19,6 +19,7 @@ func Run(ctx context.Context, cfg *config.Config, prompt string, outputFmt strin
 		Model:              cfg.Model,
 		APIKey:             cfg.APIKey,
 		BaseURL:            cfg.BaseURL,
+		Provider:           cfg.Provider,
 		CWD:                cwd,
 		MaxTurns:           cfg.MaxTurns,
 		MaxBudgetUSD:       cfg.MaxBudgetUSD,

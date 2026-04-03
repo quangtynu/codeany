@@ -204,6 +204,7 @@ func (m *Model) initAgent() tea.Cmd {
 			Model:              m.cfg.Model,
 			APIKey:             m.cfg.APIKey,
 			BaseURL:            m.cfg.BaseURL,
+			Provider:           m.cfg.Provider,
 			CWD:                cwd,
 			MaxTurns:           m.cfg.MaxTurns,
 			MaxBudgetUSD:       m.cfg.MaxBudgetUSD,

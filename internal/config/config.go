@@ -25,8 +25,9 @@ type Config struct {
 	SmallModel string `json:"smallModel,omitempty"`
 
 	// API settings
-	APIKey  string `json:"apiKey,omitempty"`
-	BaseURL string `json:"baseURL,omitempty"`
+	APIKey   string `json:"apiKey,omitempty"`
+	BaseURL  string `json:"baseURL,omitempty"`
+	Provider string `json:"provider,omitempty"` // "anthropic" or "openai" (auto-detected if empty)
 
 	// Permission settings
 	PermissionMode string `json:"permissionMode,omitempty"`
