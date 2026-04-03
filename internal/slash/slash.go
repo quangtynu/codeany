@@ -110,6 +110,8 @@ func AllCommands() []CommandDef {
 		// Multi-agent
 		{Name: "/team", Description: "Team management (create, add, send, inbox)", HasArgs: true},
 		{Name: "/worktree", Description: "Git worktree isolation (enter, exit)", HasArgs: true},
+		// Mid-query
+		{Name: "/btw", Description: "Side question (queued during execution)", HasArgs: true},
 	}
 }
 
@@ -257,6 +259,8 @@ func (h *Handler) Handle(input string) Result {
 		return h.teamCmd(args)
 	case "/worktree":
 		return h.worktreeCmd(args)
+	case "/btw":
+		return h.btwCmd(args)
 	default:
 		// Try skill invocation
 		if result, ok := h.HandleSkillInvocation(cmd, args); ok {

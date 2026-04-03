@@ -127,6 +127,9 @@ type Model struct {
 	transcriptMode bool
 	planMode       bool   // no-execution mode
 	spinnerVerb    string // current fun spinner verb
+
+	// Queued messages (typed during query execution)
+	queuedMessages []string
 }
 
 // DisplayBlock represents one visual block in the conversation
@@ -264,9 +267,15 @@ func (m *Model) createPermissionCallback() types.CanUseToolFn {
 			}
 		}
 
-		// plan mode: allow all tools (planning can read/analyze)
-		if mode == types.PermissionModePlan {
-			return allow, nil
+		// plan mode: only allow read-only tools, block writes
+		if mode == types.PermissionModePlan || m.planMode {
+			if tool.IsReadOnly(input) {
+				return allow, nil
+			}
+			return &types.PermissionDecision{
+				Behavior: types.PermissionDeny,
+				Reason:   "Plan mode: write operations blocked. Exit plan mode with /plan to execute.",
+			}, nil
 		}
 
 		// default mode: auto-approve read-only tools, ask for write tools
@@ -402,6 +411,13 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.input.Focus()
 		// Ring terminal bell to notify user
 		fmt.Print("\a")
+
+		// Process queued messages (typed during query via /btw or Enter)
+		if len(m.queuedMessages) > 0 {
+			combined := strings.Join(m.queuedMessages, "\n\nAlso: ")
+			m.queuedMessages = nil
+			return m, m.sendQuery(combined)
+		}
 		return m, nil
 
 	case permissionRequestMsg:
@@ -468,8 +484,8 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case statePermission:
 		return m.handlePermissionKey(msg)
 	case stateQuerying:
-		// Allow scrolling while querying
-		return m.handleScrollKey(msg)
+		// Allow scrolling and typing during query
+		return m.handleQueryingKey(msg)
 	}
 
 	return m, nil
@@ -507,6 +523,50 @@ func (m *Model) handleScrollKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	return m, nil
+}
+
+func (m *Model) handleQueryingKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// Scroll keys
+	switch msg.String() {
+	case "up", "k":
+		m.viewport.LineUp(1)
+		m.userScrolled = true
+		return m, nil
+	case "down", "j":
+		m.viewport.LineDown(1)
+		if m.viewport.AtBottom() {
+			m.userScrolled = false
+		}
+		return m, nil
+	case "pgup", "ctrl+b":
+		m.viewport.HalfViewUp()
+		m.userScrolled = true
+		return m, nil
+	case "pgdown", "ctrl+f":
+		m.viewport.HalfViewDown()
+		if m.viewport.AtBottom() {
+			m.userScrolled = false
+		}
+		return m, nil
+	case "enter":
+		// Queue a message typed during query (btw-style)
+		text := m.input.Value()
+		if text != "" {
+			m.input.Reset()
+			m.queuedMessages = append(m.queuedMessages, text)
+			m.blocks = append(m.blocks, DisplayBlock{
+				Type:      "system",
+				Content:   fmt.Sprintf("📝 Queued: %s", text),
+				Timestamp: time.Now(),
+			})
+			m.refreshViewport()
+		}
+		return m, nil
+	}
+
+	// Let textarea handle regular typing (so user can compose during query)
+	_, cmd := m.input.Update(msg)
+	return m, cmd
 }
 
 func (m *Model) handleInputKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -835,6 +895,12 @@ func (m *Model) View() string {
 		b.WriteString(m.renderPermissionPrompt())
 	case stateQuerying:
 		b.WriteString(m.renderActivityLine())
+		b.WriteString("\n")
+		// Show input so user can type /btw or queue messages during query
+		b.WriteString(m.input.View())
+		if len(m.queuedMessages) > 0 {
+			b.WriteString(theme.DimText.Render(fmt.Sprintf("  (%d queued)", len(m.queuedMessages))))
+		}
 	case stateInit:
 		b.WriteString(fmt.Sprintf("  %s Initializing...", m.spinner.View()))
 	default:

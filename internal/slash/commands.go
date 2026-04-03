@@ -499,8 +499,33 @@ func (h *Handler) testCmd(args []string) Result {
 // ─── /plugin ──────────────────────────────────────
 
 func (h *Handler) pluginCmd(args []string) Result {
-	allPlugins := plugins.LoadAll(config.GlobalConfigDir())
-	return Result{Message: plugins.FormatPluginList(allPlugins)}
+	configDir := config.GlobalConfigDir()
+
+	if len(args) == 0 {
+		allPlugins := plugins.LoadAll(configDir)
+		return Result{Message: plugins.FormatPluginList(allPlugins)}
+	}
+
+	switch args[0] {
+	case "list":
+		allPlugins := plugins.LoadAll(configDir)
+		return Result{Message: plugins.FormatPluginList(allPlugins)}
+	case "reload":
+		allPlugins := plugins.LoadAll(configDir)
+		return Result{Message: fmt.Sprintf("✓ Reloaded %d plugins", len(allPlugins))}
+	case "create":
+		if len(args) < 2 {
+			return Result{Message: "Usage: /plugin create <name>"}
+		}
+		name := args[1]
+		dir := filepath.Join(configDir, "plugins", name)
+		os.MkdirAll(dir, 0755)
+		manifest := fmt.Sprintf(`{"name": "%s", "description": "", "version": "0.1.0"}`, name)
+		os.WriteFile(filepath.Join(dir, "plugin.json"), []byte(manifest), 0644)
+		return Result{Message: fmt.Sprintf("✓ Plugin %q created at %s\n\nAdd skills in %s/skills/<name>/SKILL.md", name, dir, dir)}
+	default:
+		return Result{Message: "Usage: /plugin [list|reload|create <name>]"}
+	}
 }
 
 // ─── /hooks ───────────────────────────────────────
@@ -1251,6 +1276,18 @@ func (h *Handler) worktreeCmd(args []string) Result {
 
 	default:
 		return Result{Message: "Usage: /worktree [enter|exit]\n\n/worktree             List worktrees\n/worktree enter <n>   Create & enter worktree\n/worktree exit [-r]   Exit (--remove to delete)"}
+	}
+}
+
+// ─── /btw ─────────────────────────────────────────
+
+func (h *Handler) btwCmd(args []string) Result {
+	if len(args) == 0 {
+		return Result{Message: "Usage: /btw <question>\n\nAsk a quick side question. If the agent is busy, it will be queued and answered next."}
+	}
+	question := strings.Join(args, " ")
+	return Result{
+		SkillPrompt: fmt.Sprintf("[Side question from user — answer briefly then continue previous task]: %s", question),
 	}
 }
 
