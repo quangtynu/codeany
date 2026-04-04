@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/codeany-ai/codeany/internal/config"
+	sysprompt "github.com/codeany-ai/codeany/internal/prompt"
 	"github.com/codeany-ai/open-agent-sdk-go/agent"
 	"github.com/codeany-ai/open-agent-sdk-go/types"
 )
@@ -14,6 +15,12 @@ import (
 // Run executes a single prompt in non-interactive mode
 func Run(ctx context.Context, cfg *config.Config, prompt string, outputFmt string) error {
 	cwd, _ := os.Getwd()
+
+	// Build system prompt
+	sysPrompt := cfg.SystemPrompt
+	if sysPrompt == "" {
+		sysPrompt = sysprompt.BuildSystemPrompt(cfg.Model, cwd, cfg.PermissionMode, false)
+	}
 
 	opts := agent.Options{
 		Model:              cfg.Model,
@@ -25,7 +32,7 @@ func Run(ctx context.Context, cfg *config.Config, prompt string, outputFmt strin
 		MaxBudgetUSD:       cfg.MaxBudgetUSD,
 		PermissionMode:     cfg.GetPermissionMode(),
 		MCPServers:         cfg.MCPServers,
-		SystemPrompt:       cfg.SystemPrompt,
+		SystemPrompt:       sysPrompt,
 		AppendSystemPrompt: cfg.AppendSystemPrompt,
 		CustomHeaders:      cfg.CustomHeaders,
 		ProxyURL:           cfg.ProxyURL,
