@@ -16,6 +16,7 @@ import (
 
 	"github.com/codeany-ai/codeany/internal/config"
 	"github.com/codeany-ai/codeany/internal/memory"
+	"github.com/codeany-ai/codeany/internal/prompt"
 	"github.com/codeany-ai/codeany/internal/session"
 	"github.com/codeany-ai/codeany/internal/skills"
 	"github.com/codeany-ai/codeany/internal/slash"
@@ -205,6 +206,12 @@ func (m *Model) initAgent() tea.Cmd {
 	return func() tea.Msg {
 		cwd, _ := os.Getwd()
 
+		// Build system prompt: user override OR our enhanced prompt
+		sysPrompt := m.cfg.SystemPrompt
+		if sysPrompt == "" {
+			sysPrompt = prompt.BuildSystemPrompt(m.cfg.Model, cwd, m.cfg.PermissionMode, m.briefMode)
+		}
+
 		// Build extra context from skills and memory
 		extraContext := buildExtraContext(cwd)
 		appendPrompt := m.cfg.AppendSystemPrompt
@@ -224,7 +231,7 @@ func (m *Model) initAgent() tea.Cmd {
 			MaxTurns:               m.cfg.MaxTurns,
 			MaxBudgetUSD:           m.cfg.MaxBudgetUSD,
 			MCPServers:             m.cfg.MCPServers,
-			SystemPrompt:           m.cfg.SystemPrompt,
+			SystemPrompt:           sysPrompt,
 			AppendSystemPrompt:     appendPrompt,
 			CustomHeaders:          m.cfg.CustomHeaders,
 			ProxyURL:               m.cfg.ProxyURL,
